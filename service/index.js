@@ -1,49 +1,69 @@
-const fs = require('fs')
-const express = require("express");
-const app = express();
-const port = 8080;
-const util = require('./util/index');
-
-app.listen(port, () => console.log(`http://127.0.0.1:${port}`));
-
-app.use(require("body-parser").json());
-app.use(require("body-parser").urlencoded({ extended: false }));
-
-//设置跨域访问
-app.all("*", function (req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "*");
-  res.header("Access-Control-Allow-Methods", "*");
-  res.header("Content-Type", "application/json;charset=utf-8");
-  res.header("Access-Control-Allow-Credentials", true);
-  req.method.toUpperCase() === "OPTIONS" ? res.sendStatus(200) : next();
-});
-
-app.post("/login", (req, res) => {
-  let name = req.body.name;
-  let id = util.randomWord(10)
-
-  fs.readFile('./data/user.json', 'utf8', (err, data) => {
-    let newData = JSON.parse(data);
-    newData.push({ id, name })
-    fs.writeFile('./data/user.json', JSON.stringify(newData), 'utf8', () => { })
-  })
-  let data = {
-    code: 0,
-    data: {
-      id
-    }
-  }
-  res.end(JSON.stringify(data))
-});
-
+const util = require('./util/index')
+const fs = require('fs');
 var http = require('http');
 var server = http.createServer(function (req, res) { }).listen(8888);
 var io = require('socket.io').listen(server);
+let isLineList = []
+
 io.sockets.on('connection', (socket) => {
-  console.log('链接成功');
-  socket.on('compile', () => {
-    socket.emit('login', 'ok');
+
+  socket.on('login', ({ name }) => {
+    let id = util.randomWord(20);
+
+    fs.readFile('./data/user.json', 'utf8', (err, data) => {
+      let newData = JSON.parse(data);
+
+      let isHas = newData.some(item => {
+        return String(name) === String(item.name)
+      })
+      if (isHas) {
+        socket.emit('is exist');
+      } else {
+        newData.push({ id, name });
+        socket.emit('is online');
+        isLineList = [];
+        fs.writeFile('./data/user.json', JSON.stringify(newData), 'utf8', () => { })
+        socket.emit('login ok', name);
+      }
+    });
+  });
+
+  socket.on('chat msg', ({ name, msg }) => {
+    fs.readFile('./data/list.json', 'utf8', (err, data) => {
+      let newList = JSON.parse(data);
+      let time = new Date().getTime();
+
+      socket.emit('chat msg', { name, msg });
+
+      newList.push({ name, msg, time });
+      fs.writeFile('./data/list.json', JSON.stringify(newList), 'utf8', () => { })
+    });
+  })
+
+  socket.on('is online', (name) => {
+    isLineList.push(name)
+    socket.emit('user list', isLineList);
+  })
+
+  socket.on('chat list', () => {
+    fs.readFile('./data/list.json', 'utf8', (err, data) => {
+      let newList = JSON.parse(data);
+
+      newList = newList.map((item) => {
+        let { msg, name } = item
+
+        return { msg, name }
+      })
+
+      socket.emit('chat list', newList);
+    });
+  })
+
+  socket.on('disconnect', () => {
+    console.log('断开链接');
   });
 });
+
+
+
 
