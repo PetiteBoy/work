@@ -1,11 +1,11 @@
 <template>
-  <div id="app">
-    <router-view />
-  </div>
+  <he :data="[5,3,1,6,9,4,2,8]"></he>
 </template>
-<style lang="scss">
-*{
-  margin: 0;
-  padding: 0;
-}
-</style>
+<script>
+import he from './components/HelloWorld.vue';
+export default {
+  components: {
+    he
+  }
+};
+</script>
